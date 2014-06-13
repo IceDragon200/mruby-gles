@@ -1,7 +1,16 @@
 #include <mruby.h>
 
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
+#ifdef MRB_USE_GLFW3
+# if defined(__APPLE_CC__)
+#  define GLFW_INCLUDE_GLCOREARB
+# else
+#  define GLFW_INCLUDE_ES2
+# endif
+# include <GLFW/glfw3.h>
+#else
+# include <GLES2/gl2.h>
+# include <GLES2/gl2ext.h>
+#endif
 
 static struct RClass *mod_gl2ext;
 

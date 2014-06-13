@@ -5,7 +5,17 @@
 #include <mruby/array.h>
 #include <mruby/string.h>
 
-#include <GLES2/gl2.h>
+#ifdef MRB_USE_GLFW3
+# if defined(__APPLE_CC__)
+#  define GLFW_INCLUDE_GLCOREARB
+#  define GLFW_INCLUDE_GLU
+# else
+#  define GLFW_INCLUDE_ES2
+# endif
+# include <GLFW/glfw3.h>
+#else
+# include <GLES2/gl2.h>
+#endif
 
 #define MRB_VALUE_TO_GL_BOOLEAN(v_) ((mrb_test(v_)) ? (GL_TRUE) : (GL_FALSE))
 #define GL_BOOLEAN_TO_MRB_VALUE(v_) (((v_) == GL_TRUE) ? (mrb_true_value()) : \
@@ -423,7 +433,7 @@ mrb_gl_buffer_data(mrb_state* mrb, mrb_value mod)
    * String#unpack method for mruby to help with this conversion
    */
   char* data;
-  int data_len;
+  mrb_int data_len;
 
   mrb_get_args(mrb, "iisi", &target, &size, &data, &data_len, &usage);
   glBufferData((GLenum) target, (GLsizeiptr) size,
@@ -437,7 +447,7 @@ mrb_gl_buffer_sub_data(mrb_state* mrb, mrb_value mod)
 {
   mrb_int target, offset, size;
   char* data;
-  int data_len;
+  mrb_int data_len;
 
   mrb_get_args(mrb, "iiis", &target, &offset, &size, &data, &data_len);
   glBufferSubData((GLenum) target, (GLintptr) offset,
@@ -528,7 +538,7 @@ mrb_gl_compressed_tex_image_2d(mrb_state* mrb, mrb_value mod)
 {
   mrb_int target, level, internalformat, width, height, border, imageSize;
   char* data;
-  int data_len;
+  mrb_int data_len;
 
   mrb_get_args(mrb, "iiiiiiis", &target, &level, &internalformat, &width,
                &height, &border, &imageSize, &data, &data_len);
@@ -546,7 +556,7 @@ mrb_gl_compressed_tex_sub_image_2d(mrb_state* mrb, mrb_value mod)
   mrb_int target, level, xoffset, yoffset;
   mrb_int width, height, format, imageSize;
   char* data;
-  int data_len;
+  mrb_int data_len;
 
   mrb_get_args(mrb, "iiiiiiiis", &target, &level, &xoffset, &yoffset,
                &width, &height, &format, &imageSize, &data, &data_len);
@@ -785,7 +795,7 @@ mrb_gl_draw_elements(mrb_state* mrb, mrb_value mod)
 {
   mrb_int mode, count, type;
   char* indices;
-  int indices_len;
+  mrb_int indices_len;
 
   mrb_get_args(mrb, "iiis", &mode, &count, &type, &indices, &indices_len);
   glDrawElements((GLenum) mode, (GLsizei) count, (GLenum) type,
@@ -1577,7 +1587,7 @@ mrb_gl_shader_binary(mrb_state* mrb, mrb_value mod)
   mrb_value shaders;
   GLuint* shaders_ptr;
   char* binary;
-  int binary_len;
+  mrb_int binary_len;
 
   mrb_get_args(mrb, "iAisi", &n, &shaders, &binaryformat,
                &binary, &binary_len, &length);
@@ -1684,7 +1694,7 @@ mrb_gl_tex_image_2d(mrb_state* mrb, mrb_value mod)
 {
   mrb_int target, level, internalformat, width, height, border, format, type;
   char* pixels;
-  int pixels_length;
+  mrb_int pixels_length;
 
   mrb_get_args(mrb, "iiiiiiiis", &target, &level, &internalformat, &width,
                &height, &border, &format, &type, &pixels, &pixels_length);
@@ -1755,7 +1765,7 @@ mrb_gl_tex_sub_image_2d(mrb_state* mrb, mrb_value mod)
 {
   mrb_int target, level, xoffset, yoffset, width, height, format, type;
   char* pixels;
-  int pixels_len;
+  mrb_int pixels_len;
 
   mrb_get_args(mrb, "iiiiiiiis", &target, &level, &xoffset, &yoffset,
                &width, &height, &format, &type, &pixels, &pixels_len);
@@ -2187,17 +2197,19 @@ mrb_gl_vertex_attrib_pointer(mrb_state* mrb, mrb_value mod)
 
   mrb_get_args(mrb, "iiioio", &indx, &size, &type, &normalized,
                &stride, &ptr);
-  GLvoid const *p;
-  switch (mrb_type(ptr)) {
-  case MRB_TT_STRING:
-    p = RSTRING_PTR(ptr);
-    break;
-  case MRB_TT_CPTR:
-    p = mrb_cptr(ptr);
-    break;
-  default:
-    mrb_raise(mrb, E_TYPE_ERROR, "expected String/Cptr");
-    break;
+  GLvoid const *p = NULL;
+  if (!mrb_nil_p(ptr)) {
+    switch (mrb_type(ptr)) {
+    case MRB_TT_STRING:
+      p = RSTRING_PTR(ptr);
+      break;
+    case MRB_TT_CPTR:
+      p = mrb_cptr(ptr);
+      break;
+    default:
+      mrb_raise(mrb, E_TYPE_ERROR, "expected String/Cptr");
+      break;
+    }
   }
   glVertexAttribPointer((GLuint) indx, (GLint) size, (GLenum) type,
                         MRB_VALUE_TO_GL_BOOLEAN(normalized),
@@ -2223,7 +2235,9 @@ mrb_mruby_gles_gem_gl2_init(mrb_state* mrb)
   mod_gl2 = mrb_define_module(mrb, "GL2");
 
   /* constants */
+#ifdef GL_ES_VERSION_2_0
   mrb_define_const(mrb, mod_gl2, "GL_ES_VERSION_2_0", mrb_fixnum_value(GL_ES_VERSION_2_0));
+#endif
 
   mrb_define_const(mrb, mod_gl2, "GL_DEPTH_BUFFER_BIT", mrb_fixnum_value(GL_DEPTH_BUFFER_BIT));
   mrb_define_const(mrb, mod_gl2, "GL_STENCIL_BUFFER_BIT", mrb_fixnum_value(GL_STENCIL_BUFFER_BIT));
@@ -2571,7 +2585,9 @@ mrb_mruby_gles_gem_gl2_init(mrb_state* mrb)
   mrb_define_const(mrb, mod_gl2, "GL_FRAMEBUFFER_COMPLETE", mrb_fixnum_value(GL_FRAMEBUFFER_COMPLETE));
   mrb_define_const(mrb, mod_gl2, "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT", mrb_fixnum_value(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT));
   mrb_define_const(mrb, mod_gl2, "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT", mrb_fixnum_value(GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT));
+#ifdef GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS
   mrb_define_const(mrb, mod_gl2, "GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS", mrb_fixnum_value(GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS));
+#endif
   mrb_define_const(mrb, mod_gl2, "GL_FRAMEBUFFER_UNSUPPORTED", mrb_fixnum_value(GL_FRAMEBUFFER_UNSUPPORTED));
 
   mrb_define_const(mrb, mod_gl2, "GL_FRAMEBUFFER_BINDING", mrb_fixnum_value(GL_FRAMEBUFFER_BINDING));
